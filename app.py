@@ -7,35 +7,56 @@ st.set_page_config(page_title="CRM Dashboard", layout="wide")
 st.title("📊 CRM Excel Analysis Dashboard")
 st.markdown("Upload your Excel file to visualize and analyze data interactively.")
 
+# 1️⃣ Upload Excel
 uploaded_file = st.file_uploader("Upload Excel file (.xlsx)", type=["xlsx"])
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
-    # Strip invisible chars from columns
+    # Clean column names
     df.columns = df.columns.str.strip().str.replace('\xa0','').str.replace('\n','').str.replace('\r','')
 
-    # Expected columns exactly as in your file
     expected_cols = ['Stage','Source','Date of creation','Responsible','Date modified','Company name']
-
-    # Check missing columns
     missing_cols = [col for col in expected_cols if col not in df.columns]
-    if len(missing_cols) > 0:
-        st.error(f"❌ Missing columns detected: {missing_cols}")
-    else:
-        st.success("✅ Columns detected successfully!")
 
-        # Convert dates safely
+    if missing_cols:
+        st.error(f"❌ Missing columns: {missing_cols}")
+    else:
+        st.success("✅ Columns detected!")
+
+        # Convert date columns safely
         df['Date of creation'] = pd.to_datetime(df['Date of creation'], errors='coerce', dayfirst=True)
         df['Date modified'] = pd.to_datetime(df['Date modified'], errors='coerce', dayfirst=True)
 
         # Sidebar filters
         st.sidebar.header("Filters")
-        selected_stage = st.sidebar.multiselect("Select Stage", df['Stage'].unique(), default=df['Stage'].unique())
-        selected_responsible = st.sidebar.multiselect("Select Responsible", df['Responsible'].unique(), default=df['Responsible'].unique())
 
-        # Filter data
-        df_filtered = df[(df['Stage'].isin(selected_stage)) & (df['Responsible'].isin(selected_responsible))]
+        # Stage filter
+        stages = df['Stage'].dropna().unique()
+        selected_stage = st.sidebar.multiselect("Select Stage", stages, default=stages)
+
+        # Responsible filter
+        responsibles = df['Responsible'].dropna().unique()
+        selected_responsible = st.sidebar.multiselect("Select Responsible", responsibles, default=responsibles)
+
+        # Source filter
+        sources = df['Source'].dropna().unique()
+        selected_source = st.sidebar.multiselect("Select Source", sources, default=sources)
+
+        # Date range filter
+        min_date = df['Date of creation'].min().date()
+        max_date = df['Date of creation'].max().date()
+        start_date, end_date = st.sidebar.date_input("Select Date of Creation range", [min_date, max_date], min_value=min_date, max_value=max_date)
+
+        # Apply filters
+        df_filtered = df[
+            (df['Stage'].isin(selected_stage)) &
+            (df['Responsible'].isin(selected_responsible)) &
+            (df['Source'].isin(selected_source)) &
+            (df['Date of creation'].dt.date >= start_date) &
+            (df['Date of creation'].dt.date <= end_date)
+        ]
+
         st.subheader("Filtered Data")
         st.dataframe(df_filtered)
 
@@ -57,15 +78,16 @@ if uploaded_file:
         st.subheader("Source Distribution")
         st.plotly_chart(px.pie(df_filtered, names='Source', title='Source Distribution'), use_container_width=True)
 
-        # Time trends
-        st.subheader("Records Over Time")
+        # Time trend charts
+        st.subheader("Records Over Time (Date of creation)")
         df_filtered['Creation Date'] = df_filtered['Date of creation'].dt.date
-        df_time = df_filtered.groupby('Creation Date').size().reset_index(name='Count')
-        st.plotly_chart(px.line(df_time, x='Creation Date', y='Count', title='Records Created Over Time'), use_container_width=True)
+        time_data = df_filtered.groupby('Creation Date').size().reset_index(name='Count')
+        st.plotly_chart(px.line(time_data, x='Creation Date', y='Count', title='Records Created Over Time'), use_container_width=True)
 
+        st.subheader("Records Over Time (Date modified)")
         df_filtered['Modified Date'] = df_filtered['Date modified'].dt.date
-        df_mod_time = df_filtered.groupby('Modified Date').size().reset_index(name='Count')
-        st.plotly_chart(px.line(df_mod_time, x='Modified Date', y='Count', title='Records Modified Over Time'), use_container_width=True)
+        mod_time_data = df_filtered.groupby('Modified Date').size().reset_index(name='Count')
+        st.plotly_chart(px.line(mod_time_data, x='Modified Date', y='Count', title='Records Modified Over Time'), use_container_width=True)
 
         # Stage × Responsible heatmap
         st.subheader("Stage × Responsible Heatmap")
