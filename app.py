@@ -7,16 +7,17 @@ st.set_page_config(page_title="CRM Dashboard", layout="wide")
 st.title("📊 CRM Excel Analysis Dashboard")
 st.markdown("Upload your Excel file to visualize and analyze data interactively.")
 
-# 1️⃣ Upload Excel
+# Upload Excel
 uploaded_file = st.file_uploader("Upload Excel file (.xlsx)", type=["xlsx"])
 
 if uploaded_file:
+    # Excelni o‘qish, header birinchi qator
     df = pd.read_excel(uploaded_file, header=0)
 
-    # Strip invisible chars from columns
+    # Invisible chars tozalash
     df.columns = df.columns.str.strip().str.replace('\xa0','').str.replace('\n','').str.replace('\r','')
 
-    # Expected columns
+    # Kutilyotgan ustunlar
     expected_cols = ['Stage', 'Source', 'Date of creation', 'Responsible', 'Date modified', 'Company name']
     missing_cols = [col for col in expected_cols if col not in df.columns]
 
@@ -26,7 +27,7 @@ if uploaded_file:
     else:
         st.success("✅ Columns detected!")
 
-        # Convert dates
+        # Date conversion
         df['Date of creation'] = pd.to_datetime(df['Date of creation'], errors='coerce', dayfirst=True)
         df['Date modified'] = pd.to_datetime(df['Date modified'], errors='coerce', dayfirst=True)
 
@@ -49,6 +50,7 @@ if uploaded_file:
             (df['Date of creation'].dt.date <= end_date)
         ]
 
+        # Show filtered data
         st.subheader("Filtered Data")
         st.dataframe(df_filtered)
 
@@ -70,7 +72,7 @@ if uploaded_file:
         st.subheader("Source Distribution")
         st.plotly_chart(px.pie(df_filtered, names='Source', title='Source Distribution'), use_container_width=True)
 
-        # Time trend charts
+        # Time trends
         st.subheader("Records Over Time (Date of creation)")
         df_filtered['Creation Date'] = df_filtered['Date of creation'].dt.date
         time_data = df_filtered.groupby('Creation Date').size().reset_index(name='Count')
